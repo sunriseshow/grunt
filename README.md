@@ -1,5 +1,3 @@
-# grunt
-nodejs+grunt安装配置
 ## 前端自动编译NodeJs+Grunt 自动化构建搭建
 
 ### NodeJs安装
@@ -34,6 +32,7 @@ nodejs+grunt安装配置
     "load-grunt-tasks":"~3.4.0",//加载所有任务
     "grunt-contrib-concat":"~0.5.1",//合并文件
     "grunt-contrib-connect":"~0.11.2",//更新服务器文件
+     "grunt-contrib-requirejs": "*",//执行requirejs合并
     "connect-livereload":"~0.5.4",//配合connect一起使用
     "serve-static":"~1.10.0",//用于创建静态文件服务器
     "serve-index":"~1.7.2 ",//用于启用目录浏览
@@ -68,7 +67,7 @@ module.exports = function (grunt) {
     // 使用 middleware(中间件)，就必须关闭 LiveReload 的浏览器插件
     var serveStatic = require('serve-static');
     var serveIndex = require('serve-index');
-    var lrMiddleware = function(connect, options) {
+    var lrMiddleware = function (connect, options) {
         // Same as in grunt-contrib-connect
         var middlewares = [];
         var directory = options.directory || options.base[options.base.length - 1];
@@ -88,8 +87,8 @@ module.exports = function (grunt) {
 
         return [
             lrSnippet,
-            ssInclude({root:directory}),
-           // connect.directory(directory)
+            ssInclude({root: directory}),
+            // connect.directory(directory)
             //ssInclude(directory)
             // 静态文件服务器的路径
             serveStatic(options.base[0]),
@@ -98,6 +97,12 @@ module.exports = function (grunt) {
         ];
     };
     var mozjpeg = require('imagemin-mozjpeg');
+    var requireJsModules = [];
+    grunt.file.expand({cwd: "src/js"}, "**/*.js").forEach(function (file) {
+        if (file !== 'index1.js') {
+            requireJsModules.push(file.replace(/\.js$/, ''));
+        }
+    });
 // project configuration.
     grunt.initConfig({
         // Task configuration.
@@ -106,9 +111,9 @@ module.exports = function (grunt) {
             js: {
                 files: [{
                     expand: true,
-                    cwd: 'js',
+                    cwd: 'src/js',
                     src: '{*,*/*}.js',
-                    dest: 'dest'
+                    dest: 'src/dest'
                 }]
             }
         },
@@ -122,28 +127,15 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         //相对路径
-                        cwd: 'desc/',
+                        cwd: 'src/desc/',
                         src: '*.css',
-                        dest: 'css/css'
+                        dest: 'src/css'
                     }
                 ]
             }
         },
         //图片优化
-        imagemin: {
-            dist: {
-                files: [
-                    {
-                        expand: true,
-                        //相对路径
-                        cwd: 'style/image',
-                        src: ['*.{gif,jpg,png}'],
-                        dest: 'dest/img'
 
-                    }
-                ]
-            }
-        },
         imagemin: {                          // Task
             //static: {                          // Target
             //    options: {                       // Target options
@@ -160,14 +152,14 @@ module.exports = function (grunt) {
             dynamic: {// Another target
                 options: {                       // Target options
                     optimizationLevel: 3,
-                    svgoPlugins: [{ removeViewBox: false }],
+                    svgoPlugins: [{removeViewBox: false}],
                     use: [mozjpeg({quality: 80})]
                 },
                 files: [{
                     expand: true,                  // Enable dynamic expansion
-                    cwd: 'images/',                   // Src matches are relative to this path
+                    cwd: 'src/images/',                   // Src matches are relative to this path
                     src: "*.{gif,GIF,jpg,JPG,png,PNG}",   // Actual patterns to match
-                    dest: 'copyimages/'                  // Destination path prefix
+                    dest: 'src/copyimages/'                  // Destination path prefix
                 }]
             }
         },
@@ -176,9 +168,9 @@ module.exports = function (grunt) {
             dist: {
                 files: [{
                     expand: true,
-                    cwd: "sass", //sass文件地址
+                    cwd: "src/sass", //sass文件地址
                     src: ['*.scss'],//过滤的文件名
-                    dest: "css",//css文件名
+                    dest: "src/desc",//css文件名
                     ext: '.css'//扩展名
                 }],
                 options: {                       // Target options
@@ -197,15 +189,49 @@ module.exports = function (grunt) {
                     map: false
                 },
                 files: {
-                    'css/test.css': ['css/test.css'],
-                    'css/item.css': ['css/item.css']
+                    'src/css/index.css': ['src/desc/index.css']
+                    //'css/item.css': ['src/desc/item.css']
 
                 }
             }
         },
         //javascript检查纠错
         jshint: {
-            all: ['js/*','js/**/*.js']
+            all: ['src/js/*', 'src/js/**/*.js']
+        },
+        //requirejs: {
+        //    options: {
+        //        baseUrl: "src/js",
+        //        mainConfigFile: "src/js/page/index.js"
+        //    },
+        //    production: {
+        //        options: {
+        //            include: requireJsModules,
+        //            out: "src/js/index1.js"
+        //        }
+        //    }
+        //},
+        requirejs: {
+            compile: {
+                options: {
+                    baseUrl: "src/js",
+                    mainConfigFile: 'src/js/config.js',
+                    name: "./page/index",  //./是当前目录 
+                    preserveLicenseComments: false,
+                    optimize: "none",//不压缩代码
+                    out: "src/js/index.js"
+                }
+            }
+            //其他页面如需压缩则新增一个要压缩生产的js文件
+            //,detail: {
+            //            options: {
+            //                baseUrl: "src/js",
+            //                mainConfigFile: 'src/js/index.js',
+            //                name: "index",
+            //                preserveLicenseComments: false,
+            //                out: "src/js/main-brand-built2.js"
+            //            }
+            //        }
         },
         //文件合并
         concat: {
@@ -213,33 +239,33 @@ module.exports = function (grunt) {
                 separator: ';'
             },
             dist: {
-                src: ['js/common/doT.js','js/common/swiper.js'],
-                dest: 'dest/js/doTSwiper.js'
+                src: ['src/js/common/doT.js', 'src/js/common/swiper.js'],
+                dest: 'src/dest/js/doTSwiper.js'
             }
         },
         //grunt-contrib-connect配置
         connect: {
 
-                livereload: {
-                    options: {
+            kxyewap: {
+                options: {
 
-                        // 服务器端口号
-                            port: 8000,
-                            // 服务器地址(可以使用主机名localhost，也能使用IP)
-                            hostname: '*',
-                            // 物理路径(默认为. 即根目录) 注：使用'.'或'..'为路径的时，可能会返回403 Forbidden. 此时将该值改为相对路径 如：/grunt/reloard。
-                            base: '',
-                            directory:"",
-                            open: {
-                                target: 'http://127.0.0.1:8000',
-                                appName:"chrome"
-                            },
-                        // 通过LiveReload脚本，让页面重新加载。
-                           middleware: lrMiddleware
+                    // 服务器端口号
+                    port: 1006,
+                    // 服务器地址(可以使用主机名localhost，也能使用IP)
+                    hostname: '*',
+                    // 物理路径(默认为. 即根目录) 注：使用'.'或'..'为路径的时，可能会返回403 Forbidden. 此时将该值改为相对路径 如：/grunt/reloard。
+                    base: '',
+                    directory: "",
+                    open: {
+                        target: 'http://127.0.0.1:1006/src',
+                        appName: "chrome"
+                    },
+                    // 通过LiveReload脚本，让页面重新加载。
+                    middleware: lrMiddleware
 
-                    }
                 }
-           //,
+            }
+            //,
             //dev: {
             //    options: {
             //        base: "web1",
@@ -254,8 +280,8 @@ module.exports = function (grunt) {
         },
         //监听
         watch: {
-            sass: {tasks: ['sass'], files: 'sass/*.scss', option: { livereload: lrPort }},
-            rem: {tasks: ['px_to_rem'], files: 'css/*.css', option: { livereload: lrPort }},
+            sass: {tasks: ['sass'], files: ['src/sass/*.scss', 'src/sass/**/*.scss'], option: {livereload: lrPort}},
+            rem: {tasks: ['px_to_rem'], files: 'src/desc/*.css', option: {livereload: lrPort}},
             client: {
                 // 我们不需要配置额外的任务，watch任务已经内建LiveReload浏览器刷新的代码片段。
                 options: {
@@ -263,7 +289,7 @@ module.exports = function (grunt) {
                 },
                 // '**' 表示包含所有的子目录
                 // '*' 表示包含所有的文件
-                files: ['*',"html/*"]
+                files: ['src/*.html', "src/**/*.html", "src/css/*.css", "src/js/**/*.js", "src/js/*.js"]
 
             }
         }
@@ -278,21 +304,21 @@ module.exports = function (grunt) {
     grunt.registerTask("image", ['imagemin']);
     grunt.registerTask('concatfile', ['concat']);//合并
     grunt.registerTask('jshints', ['jshint']);//js代码检测，一般不用，好多都不正确
-    grunt.registerTask('demo', ['connect', 'watch']);//监听
+    grunt.registerTask('require', ['requirejs']);//requirejs合并
+    grunt.registerTask('serve', ['sass', 'px_to_rem', 'connect', 'watch']);//监听
 };
 ```
 
+在配置文件路径下，执行 npm install  把相应的模块都加载进来，这样确保需要的module模块能够使用。
 
 #### 说明
-安装sass之前必须先安装 Ruby 和sass，安装成功后，在grunt里的sass命令才能执行成功。下面有安装的具体文档，这里就不再细细说明了。
+1、安装sass之前必须先安装 Ruby 和sass，安装成功后，在grunt里的sass命令才能执行成功。下面有安装的具体文档，这里就不再细细说明了。
+2、requirejs 中的参数
+baseUrl  指存放模块的根目录，这里是r4/js，因为cd到r4中了，只需设置为js。可选，如果没有设置将从r4中查找main.js。
+name     模块的入口文件，这里设置成“main”，那么r.js会从baseUrl+main去查找。这里实际是r4/js/main.js。r.js会分析main.js，找出其所依赖的所有其它模块，然后合并压缩。
+out        指合并压缩后输出的文件路径，这里直接是built.js，那么将输出到根目录r4下
+requirejs 采用的是r.js来合并压缩的，详细参数可以根据r.js
 参考文档内容
-在配置connect-ssiinclude时需要把安装的modules里的文件修改一下
-
-     if (/\w+\.html/.test(pathname) === false) {
-            next();
-            return;
-        }
-      以前文件是s*htm，现在需要改成html这样，才能应用于html扩展名的文件
 
 [connect-livereload](https://github.com/intesso/connect-livereload)
 [ssi](https://github.com/kidwm/node-ssi)
@@ -302,3 +328,4 @@ module.exports = function (grunt) {
 [ruby安装](http://www.w3cplus.com/sassguide/install.html)
 [LiveReload部署](https://github.com/zhonglimh/Grunt-LiveReload)
 [imagemin安装](https://github.com/gruntjs/grunt-contrib-imagemin)
+[r.js详细配置](http://segmentfault.com/a/1190000002403806)
